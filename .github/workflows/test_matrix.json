@@ -250,25 +250,25 @@
 		"name" : "windows-2022, clang-16, msvc-stl, shared=true, tsan=false"
 	},
 	{
-		"os": "macos-12",
+		"os": "macos-latest",
 		"stdlib": "libc++",
 		"tsan": false,
 		"shared": false,
-		"name" : "macos-12, clang, libc++, shared=false, tsan=false"		
+		"name" : "macos-14, clang, libc++, shared=false, tsan=false"		
 	},
 	{
-		"os": "macos-12",
+		"os": "macos-latest",
 		"stdlib": "libc++",
 		"tsan": false,
 		"shared": true,
-		"name" : "macos-12, clang, libc++, shared=true, tsan=false"
+		"name" : "macos-14, clang, libc++, shared=true, tsan=false"
 	},
 	{
-		"os": "macos-12",
+		"os": "macos-latest",
 		"stdlib": "libc++",
 		"tsan": true,
 		"shared": false,
-		"name" : "macos-12, clang, libc++, shared=false, tsan=true"
+		"name" : "macos-14, clang, libc++, shared=false, tsan=true"
 	},
 	{
 		"os": "macos-12",
