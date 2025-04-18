@@ -69,7 +69,7 @@ namespace concurrencpp::details {
 
         void enqueue_foreign(concurrencpp::task& task);
         void enqueue_foreign(std::span<concurrencpp::task> tasks);
-        void enqueue_foreign(std::deque<concurrencpp::task>::iterator begin, std::deque<concurrencpp::task>::iterator end);
+        void enqueue_foreign(std::deque<task>::iterator begin, std::deque<task>::iterator end);
         void enqueue_foreign(std::span<concurrencpp::task>::iterator begin, std::span<concurrencpp::task>::iterator end);
 
         void enqueue_local(concurrencpp::task& task);
@@ -78,8 +78,6 @@ namespace concurrencpp::details {
         void shutdown();
 
         std::chrono::milliseconds max_worker_idle_time() const noexcept;
-
-        bool appears_empty() const noexcept;
     };
 }  // namespace concurrencpp::details
 
@@ -246,11 +244,11 @@ void thread_pool_worker::balance_work() {
 
     // clear everything we've donated.
     assert(std::all_of(m_private_queue.begin(), m_private_queue.begin() + begin, [](auto& task) {
-        return !static_cast<bool>(task);
+        return static_cast<bool>(task.empty());
     }));
 
     assert(std::all_of(m_private_queue.begin() + begin, m_private_queue.end(), [](auto& task) {
-        return static_cast<bool>(task);
+        return !static_cast<bool>(task.empty());
     }));
 
     m_private_queue.erase(m_private_queue.begin(), m_private_queue.begin() + begin);
@@ -501,17 +499,13 @@ void thread_pool_worker::shutdown() {
         public_queue = std::move(m_public_queue);
         private_queue = std::move(m_private_queue);
     }
-
+    
     public_queue.clear();
     private_queue.clear();
 }
 
 std::chrono::milliseconds thread_pool_worker::max_worker_idle_time() const noexcept {
     return m_max_idle_time;
-}
-
-bool thread_pool_worker::appears_empty() const noexcept {
-    return m_private_queue.empty() && !m_task_found_or_abort.load(std::memory_order_relaxed);
 }
 
 thread_pool_executor::thread_pool_executor(std::string_view pool_name,
@@ -558,7 +552,7 @@ void thread_pool_executor::enqueue(concurrencpp::task task) {
     const auto parent_pool = details::s_tl_thread_pool_data.parent_pool;
     const auto this_worker_index = details::s_tl_thread_pool_data.this_thread_index;
 
-    if ((this_worker != nullptr) && (this == parent_pool) && (this_worker->appears_empty())) {
+    if ((this_worker != nullptr) && (this == parent_pool)) {
         return this_worker->enqueue_local(task);
     }
 
@@ -567,59 +561,8 @@ void thread_pool_executor::enqueue(concurrencpp::task task) {
         return m_workers[idle_worker_pos].enqueue_foreign(task);
     }
 
-    if ((this_worker != nullptr) && (this == parent_pool)) {
-        return this_worker->enqueue_local(task);
-    }
-
     const auto next_worker = m_round_robin_cursor.fetch_add(1, std::memory_order_relaxed) % m_workers.size();
     m_workers[next_worker].enqueue_foreign(task);
-}
-
-void thread_pool_executor::enqueue(std::span<concurrencpp::task> tasks) {
-    const auto this_worker = details::s_tl_thread_pool_data.this_worker;
-    const auto parent_pool = details::s_tl_thread_pool_data.parent_pool;
-
-    if ((this_worker != nullptr) && (this == parent_pool)) {
-        return this_worker->enqueue_local(tasks);
-    }
-
-    if (tasks.size() < m_workers.size()) {
-        for (auto& task : tasks) {
-            enqueue(std::move(task));
-        }
-
-        return;
-    }
-
-    const auto task_count = tasks.size();
-    const auto total_worker_count = m_workers.size();
-    const auto donation_count = task_count / total_worker_count;
-    auto extra = task_count - donation_count * total_worker_count;
-
-    size_t begin = 0;
-    size_t end = donation_count;
-
-    for (size_t i = 0; i < total_worker_count; i++) {
-        assert(begin < task_count);
-
-        if (extra != 0) {
-            end++;
-            extra--;
-        }
-
-        assert(end <= task_count);
-
-        auto tasks_begin_it = tasks.begin() + begin;
-        auto tasks_end_it = tasks.begin() + end;
-
-        assert(tasks_begin_it < tasks.end());
-        assert(tasks_end_it <= tasks.end());
-
-        m_workers[i].enqueue_foreign(tasks_begin_it, tasks_end_it);
-
-        begin = end;
-        end += donation_count;
-    }
 }
 
 int thread_pool_executor::max_concurrency_level() const noexcept {

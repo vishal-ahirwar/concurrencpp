@@ -8,11 +8,10 @@
 
 namespace concurrencpp::details {
     template<class executor_type>
-    class resume_on_awaitable : public suspend_always {
+    class resume_on_awaitable : public task_state {
 
        private:
         executor_type& m_executor;
-        bool m_interrupted = false;
 
        public:
         resume_on_awaitable(executor_type& executor) noexcept : m_executor(executor) {}
@@ -25,15 +24,10 @@ namespace concurrencpp::details {
 
         void await_suspend(coroutine_handle<void> handle) {
             try {
-                m_executor.post(await_via_functor {handle, &m_interrupted});
+                set_handle(handle);
+                m_executor.enqueue(task(this));
             } catch (...) {
                 // the exception caused the enqeueud task to be broken and resumed with an interrupt, no need to do anything here.
-            }
-        }
-
-        void await_resume() const {
-            if (m_interrupted) {
-                throw errors::broken_task(consts::k_broken_task_exception_error_msg);
             }
         }
     };

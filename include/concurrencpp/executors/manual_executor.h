@@ -41,7 +41,6 @@ namespace concurrencpp {
         manual_executor();
 
         void enqueue(task task) override;
-        void enqueue(std::span<task> tasks) override;
 
         int max_concurrency_level() const noexcept override;
 

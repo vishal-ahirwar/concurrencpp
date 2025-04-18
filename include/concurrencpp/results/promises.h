@@ -48,24 +48,16 @@ namespace concurrencpp::details {
         initialy_rescheduled_promise(class_type&&, executor_tag, std::shared_ptr<executor_type> executor, argument_types&&... args) :
             initialy_rescheduled_promise(executor_tag {}, *executor, std::forward<argument_types>(args)...) {}
 
-        class initial_scheduling_awaiter : public suspend_always {
-
-           private:
-            bool m_interrupted = false;
+        class initial_scheduling_awaiter : public task_state {
 
            public:
             template<class promise_type>
             void await_suspend(coroutine_handle<promise_type> handle) {
                 try {
-                    handle.promise().m_initial_executor.post(await_via_functor {handle, &m_interrupted});
+                    set_handle(handle);
+                    handle.promise().m_initial_executor.enqueue(task(this));
                 } catch (...) {
-                    // do nothing. ~await_via_functor will resume the coroutine and throw an exception.
-                }
-            }
-
-            void await_resume() const {
-                if (m_interrupted) {
-                    throw errors::broken_task(consts::k_broken_task_exception_error_msg);
+                    // do nothing. ~task will resume the coroutine and throw an exception.
                 }
             }
         };

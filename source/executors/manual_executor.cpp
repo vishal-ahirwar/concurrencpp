@@ -19,18 +19,6 @@ void manual_executor::enqueue(concurrencpp::task task) {
     m_condition.notify_all();
 }
 
-void manual_executor::enqueue(std::span<concurrencpp::task> tasks) {
-    std::unique_lock<decltype(m_lock)> lock(m_lock);
-    if (m_abort) {
-        details::throw_runtime_shutdown_exception(name);
-    }
-
-    m_tasks.insert(m_tasks.end(), std::make_move_iterator(tasks.begin()), std::make_move_iterator(tasks.end()));
-    lock.unlock();
-
-    m_condition.notify_all();
-}
-
 int manual_executor::max_concurrency_level() const noexcept {
     return details::consts::k_manual_executor_max_concurrency_level;
 }

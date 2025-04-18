@@ -93,14 +93,6 @@ void worker_thread_executor::enqueue_local(concurrencpp::task& task) {
     m_private_queue.emplace_back(std::move(task));
 }
 
-void worker_thread_executor::enqueue_local(std::span<concurrencpp::task> tasks) {
-    if (m_private_atomic_abort.load(std::memory_order_relaxed)) {
-        details::throw_runtime_shutdown_exception(name);
-    }
-
-    m_private_queue.insert(m_private_queue.end(), std::make_move_iterator(tasks.begin()), std::make_move_iterator(tasks.end()));
-}
-
 void worker_thread_executor::enqueue_foreign(concurrencpp::task& task) {
     std::unique_lock<std::mutex> lock(m_lock);
     if (m_abort) {
@@ -121,40 +113,12 @@ void worker_thread_executor::enqueue_foreign(concurrencpp::task& task) {
     }
 }
 
-void worker_thread_executor::enqueue_foreign(std::span<concurrencpp::task> tasks) {
-    std::unique_lock<std::mutex> lock(m_lock);
-    if (m_abort) {
-        details::throw_runtime_shutdown_exception(name);
-    }
-
-    const auto is_empty = m_public_queue.empty();
-    m_public_queue.insert(m_public_queue.end(), std::make_move_iterator(tasks.begin()), std::make_move_iterator(tasks.end()));
-
-    if (!m_thread.joinable()) {
-        return make_os_worker_thread();
-    }
-
-    lock.unlock();
-
-    if (is_empty) {
-        m_semaphore.release();
-    }
-}
-
 void worker_thread_executor::enqueue(concurrencpp::task task) {
     if (details::s_tl_this_worker == this) {
         return enqueue_local(task);
     }
 
     enqueue_foreign(task);
-}
-
-void worker_thread_executor::enqueue(std::span<concurrencpp::task> tasks) {
-    if (details::s_tl_this_worker == this) {
-        return enqueue_local(tasks);
-    }
-
-    enqueue_foreign(tasks);
 }
 
 int worker_thread_executor::max_concurrency_level() const noexcept {

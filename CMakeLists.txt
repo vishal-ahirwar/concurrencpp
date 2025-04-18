@@ -36,9 +36,9 @@ set(concurrencpp_sources
         source/utils/math_helper.cpp)
 
 set(concurrencpp_headers
+        include/concurrencpp/task.h        
         include/concurrencpp/concurrencpp.h
         include/concurrencpp/errors.h
-        include/concurrencpp/task.h
         include/concurrencpp/forward_declarations.h
         include/concurrencpp/platform_defs.h
         include/concurrencpp/coroutines/coroutine.h

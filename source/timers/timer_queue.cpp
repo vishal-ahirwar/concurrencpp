@@ -148,9 +148,8 @@ namespace concurrencpp::details {
 timer_queue::timer_queue(milliseconds max_waiting_time,
                          const std::function<void(std::string_view thread_name)>& thread_started_callback,
                          const std::function<void(std::string_view thread_name)>& thread_terminated_callback) :
-    m_atomic_abort(false), m_abort(false), m_idle(true),
-    m_max_waiting_time(max_waiting_time),
-    m_thread_started_callback(thread_started_callback),
+    m_atomic_abort(false),
+    m_abort(false), m_idle(true), m_max_waiting_time(max_waiting_time), m_thread_started_callback(thread_started_callback),
     m_thread_terminated_callback(thread_terminated_callback) {}
 
 timer_queue::~timer_queue() noexcept {
@@ -275,13 +274,12 @@ concurrencpp::details::thread timer_queue::ensure_worker_thread(std::unique_lock
 concurrencpp::lazy_result<void> timer_queue::make_delay_object_impl(std::chrono::milliseconds due_time,
                                                                     std::shared_ptr<concurrencpp::timer_queue> self,
                                                                     std::shared_ptr<concurrencpp::executor> executor) {
-    class delay_object_awaitable : public details::suspend_always {
+    class delay_object_awaitable : public task_state {
 
        private:
         const size_t m_due_time_ms;
         timer_queue& m_parent_queue;
         std::shared_ptr<concurrencpp::executor> m_executor;
-        bool m_interrupted = false;
 
        public:
         delay_object_awaitable(size_t due_time_ms,
@@ -292,20 +290,15 @@ concurrencpp::lazy_result<void> timer_queue::make_delay_object_impl(std::chrono:
 
         void await_suspend(details::coroutine_handle<void> coro_handle) noexcept {
             try {
-                m_parent_queue.make_timer_impl(m_due_time_ms,
-                                               0,
-                                               std::move(m_executor),
-                                               true,
-                                               details::await_via_functor {coro_handle, &m_interrupted});
+                set_handle(coro_handle);
+                task this_task(this);
+
+                m_parent_queue.make_timer_impl(m_due_time_ms, 0, std::move(m_executor), true, [t = std::move(this_task)] () mutable {
+                    t();
+                });
 
             } catch (...) {
-                // do nothing. ~await_via_functor will resume the coroutine and throw an exception.
-            }
-        }
-
-        void await_resume() const {
-            if (m_interrupted) {
-                throw errors::broken_task(details::consts::k_broken_task_exception_error_msg);
+                // do nothing. ~task will resume the coroutine and throw an exception.
             }
         }
     };

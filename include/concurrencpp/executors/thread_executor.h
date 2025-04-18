@@ -32,7 +32,6 @@ namespace concurrencpp {
         ~thread_executor() noexcept;
 
         void enqueue(task task) override;
-        void enqueue(std::span<task> tasks) override;
 
         int max_concurrency_level() const noexcept override;
 
