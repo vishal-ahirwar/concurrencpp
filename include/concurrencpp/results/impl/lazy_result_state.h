@@ -8,7 +8,7 @@
 namespace concurrencpp::details {
     struct lazy_final_awaiter : public suspend_always {
         template<class promise_type>
-        coroutine_handle<void> await_suspend(coroutine_handle<promise_type> handle) noexcept {
+        coroutine_handle<void> await_suspend(coroutine_handle<promise_type> handle) noexcept { 
             return handle.promise().resume_caller();
         }
     };
@@ -26,6 +26,14 @@ namespace concurrencpp::details {
         coroutine_handle<void> await(coroutine_handle<void> caller_handle) noexcept {
             m_caller_handle = caller_handle;
             return coroutine_handle<lazy_result_state_base>::from_promise(*this);
+        }
+
+        suspend_always initial_suspend() const noexcept {
+            return {};
+        }
+
+        lazy_final_awaiter final_suspend() const noexcept {
+            return {};
         }
     };
 
@@ -45,21 +53,13 @@ namespace concurrencpp::details {
             return lazy_result<type>(self_handle);
         }
 
-        void unhandled_exception() noexcept {
-            m_producer.build_exception(std::current_exception());
-        }
-
-        suspend_always initial_suspend() const noexcept {
-            return {};
-        }
-
-        lazy_final_awaiter final_suspend() const noexcept {
-            return {};
-        }
-
         template<class... argument_types>
         void set_result(argument_types&&... arguments) noexcept(noexcept(type(std::forward<argument_types>(arguments)...))) {
             m_producer.build_result(std::forward<argument_types>(arguments)...);
+        }
+
+        void unhandled_exception() noexcept {
+            m_producer.build_exception(std::current_exception());
         }
 
         type get() {

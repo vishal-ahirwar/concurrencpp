@@ -18,6 +18,12 @@ namespace concurrencpp {
     class lazy_result;
 
     template<class type>
+    class fork_result;
+
+    template<class type>
+    class join_result;
+
+    template<class type>
     class result_promise;
 
     template<class type>
@@ -47,8 +53,13 @@ namespace concurrencpp::details {
     template<class type>
     class lazy_result_state;
 
+    template<class type>
+    class fj_result_state;
+
     class when_result_helper;
     struct shared_result_helper;
+
+    class fj_awaitable_base;
 }  // namespace concurrencpp::details
 
 #endif

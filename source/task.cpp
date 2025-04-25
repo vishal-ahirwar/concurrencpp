@@ -14,7 +14,7 @@ using concurrencpp::task;
 task_state::task_state() noexcept : m_status(status::idle) {}
 
 task_state ::~task_state() noexcept {
-    assert(m_status != status::idle);
+    assert(m_caller_handle ? (m_status != status::idle) : true);
 }
 
 void task_state::set_handle(details::coroutine_handle<void> caller_handle) noexcept {

@@ -13,10 +13,6 @@ namespace concurrencpp::tests {
             throw executor_enqueue_exception();
         }
 
-        void enqueue(std::span<concurrencpp::task>) override {
-            throw executor_enqueue_exception();
-        }
-
         int max_concurrency_level() const noexcept override {
             return 0;
         }

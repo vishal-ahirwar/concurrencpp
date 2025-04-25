@@ -34,16 +34,24 @@ namespace concurrencpp {
             static_assert(std::is_invocable_v<callable_type, argument_types...>,
                           "concurrencpp::executor::post - <<callable_type>> is not invokable with <<argument_types...>>");
 
+            if (shutdown_requested()) {
+                details::throw_runtime_shutdown_exception(name);
+            }
+
             return post_bridge({},
-                        *static_cast<executor_type*>(this),
-                        std::forward<callable_type>(callable),
-                        std::forward<argument_types>(arguments)...);
+                               *static_cast<executor_type*>(this),
+                               std::forward<callable_type>(callable),
+                               std::forward<argument_types>(arguments)...);
         }
 
         template<class executor_type, class callable_type, class... argument_types>
         auto do_submit(callable_type&& callable, argument_types&&... arguments) {
             static_assert(std::is_invocable_v<callable_type, argument_types...>,
                           "concurrencpp::executor::submit - <<callable_type>> is not invokable with <<argument_types...>>");
+
+            if (shutdown_requested()) {
+                details::throw_runtime_shutdown_exception(name);
+            }
 
             using return_type = typename std::invoke_result_t<callable_type, argument_types...>;
             return submit_bridge<return_type>({},

@@ -26,6 +26,7 @@ set(concurrencpp_sources
         source/results/impl/consumer_context.cpp
         source/results/impl/result_state.cpp
         source/results/impl/shared_result_state.cpp
+        source/results/fj_result.cpp
         source/runtime/runtime.cpp
         source/threads/atomic_wait.cpp
         source/threads/async_lock.cpp
@@ -66,6 +67,7 @@ set(concurrencpp_headers
         include/concurrencpp/results/shared_result.h
         include/concurrencpp/results/result_awaitable.h
         include/concurrencpp/results/shared_result_awaitable.h
+        include/concurrencpp/results/fj_result.h
         include/concurrencpp/results/result_fwd_declarations.h
         include/concurrencpp/results/when_result.h
         include/concurrencpp/results/resume_on.h

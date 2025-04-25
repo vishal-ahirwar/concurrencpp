@@ -87,10 +87,10 @@ void concurrencpp::tests::test_thread_pool_executor_shutdown_method_access() {
     executor->shutdown();
     assert_true(executor->shutdown_requested());
 
-/* assert_throws<concurrencpp::errors::runtime_shutdown>([executor] {
+    assert_throws<concurrencpp::errors::runtime_shutdown>([executor] {
         executor->post([] {
         });
-    });*/
+    });
 }
 
 void concurrencpp::tests::test_thread_pool_executor_shutdown_method_more_than_once() {

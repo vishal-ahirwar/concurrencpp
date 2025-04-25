@@ -1,5 +1,6 @@
 #include "concurrencpp/executors/thread_pool_executor.h"
 
+#include <deque>
 #include <semaphore>
 #include <algorithm>
 
@@ -9,20 +10,14 @@ using concurrencpp::details::thread_pool_worker;
 
 namespace concurrencpp::details {
     namespace {
-        struct thread_pool_per_thread_data {
-            thread_pool_worker* this_worker = nullptr;
-            const thread_pool_executor* parent_pool = nullptr;
-            size_t this_thread_index = static_cast<size_t>(-1);
-            const size_t this_thread_hashed_id = calculate_hashed_id();
+        size_t calculate_hashed_index() noexcept {
+            const auto this_thread_id = thread::get_current_virtual_id();
+            const std::hash<size_t> hash;
+            return hash(this_thread_id);
+        }
 
-            static size_t calculate_hashed_id() noexcept {
-                const auto this_thread_id = thread::get_current_virtual_id();
-                const std::hash<size_t> hash;
-                return hash(this_thread_id);
-            }
-        };
-
-        thread_local thread_pool_per_thread_data s_tl_thread_pool_data;
+        thread_local thread_pool_worker* s_tl_thread_pool_worker;
+        thread_local const size_t s_tl_hashed_index = calculate_hashed_index();
     }  // namespace
 
     class alignas(CRCPP_CACHE_LINE_ALIGNMENT) thread_pool_worker {
@@ -75,6 +70,9 @@ namespace concurrencpp::details {
         void enqueue_local(concurrencpp::task& task);
         void enqueue_local(std::span<concurrencpp::task> tasks);
 
+        const thread_pool_executor* parent_pool() const noexcept;
+        size_t index() const noexcept;
+
         void shutdown();
 
         std::chrono::milliseconds max_worker_idle_time() const noexcept;
@@ -117,15 +115,15 @@ bool idle_worker_set::try_acquire_flag(size_t index) noexcept {
 }
 
 size_t idle_worker_set::find_idle_worker(size_t caller_index) noexcept {
+    assert(caller_index < m_size || caller_index == static_cast<size_t>(-1));
+    
     if (m_approx_size.load(std::memory_order_relaxed) <= 0) {
         return static_cast<size_t>(-1);
     }
 
-    const auto starting_pos =
-        (caller_index != static_cast<size_t>(-1)) ? caller_index : (s_tl_thread_pool_data.this_thread_hashed_id % m_size);
-
+    const auto search_index = (caller_index != static_cast<size_t>(-1)) ? caller_index : (s_tl_hashed_index % m_size);
     for (size_t i = 0; i < m_size; i++) {
-        const auto index = (starting_pos + i) % m_size;
+        const auto index = (search_index + i) % m_size;
         if (index == caller_index) {
             continue;
         }
@@ -140,15 +138,15 @@ size_t idle_worker_set::find_idle_worker(size_t caller_index) noexcept {
 
 void idle_worker_set::find_idle_workers(size_t caller_index, std::vector<size_t>& result_buffer, size_t max_count) noexcept {
     assert(result_buffer.capacity() >= max_count);
+    assert(caller_index < m_size);
+    assert(s_tl_thread_pool_worker != nullptr);
+    assert(caller_index == s_tl_thread_pool_worker->index());
 
     const auto approx_size = m_approx_size.load(std::memory_order_relaxed);
     if (approx_size <= 0) {
         return;
     }
-
-    assert(caller_index < m_size);
-    assert(caller_index == s_tl_thread_pool_data.this_thread_index);
-
+ 
     size_t count = 0;
     const auto max_waiters = std::min(static_cast<size_t>(approx_size), max_count);
 
@@ -172,16 +170,16 @@ thread_pool_worker::thread_pool_worker(thread_pool_executor& parent_pool,
                                        const std::function<void(std::string_view thread_name)>& thread_started_callback,
                                        const std::function<void(std::string_view thread_name)>& thread_terminated_callback) :
     m_atomic_abort(false),
-    m_parent_pool(parent_pool), m_index(index), m_pool_size(pool_size), m_max_idle_time(max_idle_time),
-    m_worker_name(details::make_executor_worker_name(parent_pool.name)), m_semaphore(0), m_idle(true), m_abort(false),
-    m_task_found_or_abort(false), m_thread_started_callback(thread_started_callback),
+    m_parent_pool(parent_pool), m_index(index), m_pool_size(pool_size),
+    m_max_idle_time(max_idle_time), m_worker_name(details::make_executor_worker_name(parent_pool.name)), m_semaphore(0), m_idle(true),
+    m_abort(false), m_task_found_or_abort(false), m_thread_started_callback(thread_started_callback),
     m_thread_terminated_callback(thread_terminated_callback) {
     m_idle_worker_list.reserve(pool_size);
 }
 
 thread_pool_worker::thread_pool_worker(thread_pool_worker&& rhs) noexcept :
-    m_parent_pool(rhs.m_parent_pool), m_index(rhs.m_index), m_pool_size(rhs.m_pool_size), m_max_idle_time(rhs.m_max_idle_time),
-    m_semaphore(0), m_idle(true), m_abort(true) {
+    m_parent_pool(rhs.m_parent_pool), m_index(rhs.m_index), m_pool_size(rhs.m_pool_size),
+    m_max_idle_time(rhs.m_max_idle_time), m_semaphore(0), m_idle(true), m_abort(true) {
     std::abort();  // shouldn't be called
 }
 
@@ -360,9 +358,7 @@ bool thread_pool_worker::drain_queue() {
 }
 
 void thread_pool_worker::work_loop() {
-    s_tl_thread_pool_data.this_worker = this;
-    s_tl_thread_pool_data.parent_pool = &m_parent_pool;
-    s_tl_thread_pool_data.this_thread_index = m_index;
+    s_tl_thread_pool_worker = this;
 
     try {
         while (true) {
@@ -474,6 +470,14 @@ void thread_pool_worker::enqueue_local(std::span<concurrencpp::task> tasks) {
     m_private_queue.insert(m_private_queue.end(), std::make_move_iterator(tasks.begin()), std::make_move_iterator(tasks.end()));
 }
 
+const thread_pool_executor* thread_pool_worker::parent_pool() const noexcept {
+    return &m_parent_pool;
+}
+
+size_t thread_pool_worker::index() const noexcept {
+    return m_index;
+}
+
 void thread_pool_worker::shutdown() {
     assert(!m_atomic_abort.load(std::memory_order_relaxed));
     m_atomic_abort.store(true, std::memory_order_relaxed);
@@ -548,15 +552,14 @@ void thread_pool_executor::mark_worker_active(size_t index) noexcept {
 }
 
 void thread_pool_executor::enqueue(concurrencpp::task task) {
-    const auto this_worker = details::s_tl_thread_pool_data.this_worker;
-    const auto parent_pool = details::s_tl_thread_pool_data.parent_pool;
-    const auto this_worker_index = details::s_tl_thread_pool_data.this_thread_index;
+    const auto this_worker = details::s_tl_thread_pool_worker;
 
-    if ((this_worker != nullptr) && (this == parent_pool)) {
+    if ((this_worker != nullptr) && (this == this_worker->parent_pool())) {
         return this_worker->enqueue_local(task);
     }
 
-    const auto idle_worker_pos = m_idle_workers.find_idle_worker(this_worker_index);
+    const auto search_index = (this_worker != nullptr) ? this_worker->index() : static_cast<size_t>(-1);
+    const auto idle_worker_pos = m_idle_workers.find_idle_worker(search_index);
     if (idle_worker_pos != static_cast<size_t>(-1)) {
         return m_workers[idle_worker_pos].enqueue_foreign(task);
     }
