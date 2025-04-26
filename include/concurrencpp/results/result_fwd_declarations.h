@@ -2,7 +2,6 @@
 #define CONCURRENCPP_RESULT_FWD_DECLARATIONS_H
 
 #include "concurrencpp/forward_declarations.h"
-#include "concurrencpp/coroutines/coroutine.h"
 
 #include <memory>
 #include <utility>

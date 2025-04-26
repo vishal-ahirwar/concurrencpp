@@ -1,7 +1,7 @@
 #ifndef CONCURRENCPP_COROUTINE_H
 #define CONCURRENCPP_COROUTINE_H
 
-#include "../platform_defs.h"
+#include "concurrencpp/platform_defs.h"
 
 #if !__has_include(<coroutine>) && __has_include(<experimental/coroutine>)
 

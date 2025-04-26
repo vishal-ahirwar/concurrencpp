@@ -1,11 +1,16 @@
 #ifndef CONCURRENCPP_FORK_JOIN_RESULT_H
 #define CONCURRENCPP_FORK_JOIN_RESULT_H
 
-#include "concurrencpp/results/promises.h"
+#include "concurrencpp/task.h"
+#include "concurrencpp/coroutines/coroutine.h"
+#include "concurrencpp/results/impl/producer_context.h"
+#include "concurrencpp/results/impl/return_value_struct.h"
 
-#include <tuple>
 #include <array>
+#include <memory>
+#include <vector>
 #include <utility>
+#include <stdexcept>
 #include <type_traits>
 
 namespace concurrencpp::details {
@@ -55,7 +60,7 @@ namespace concurrencpp::details {
     };
 
     template<class type>
-    struct fj_promise : public fj_result_state<type>, public return_value_struct<lazy_promise<type>, type> {};
+    struct fj_promise : public fj_result_state<type>, public return_value_struct<fj_promise<type>, type> {};
 
     struct fj_helper {
         template<class type>
@@ -344,8 +349,8 @@ namespace concurrencpp {
         return details::fj_awaitable<executor_type, type, n> {executor, results};
     }
 
-    template<class type>
-    auto fork_join(class executor_type* executor, std::vector<fork_result<type>> results) {
+    template<class executor_type, class type>
+    auto fork_join(executor_type* executor, std::vector<fork_result<type>> results) {
         if (executor == nullptr) [[unlikely]] {
             throw std::invalid_argument("null executor");
         }

@@ -27,7 +27,7 @@ namespace concurrencpp::details {
         void set_idle(size_t idle_thread) noexcept;
         void set_active(size_t idle_thread) noexcept;
 
-        size_t find_idle_worker(size_t caller_index) noexcept;
+        size_t find_idle_worker() noexcept;
         void find_idle_workers(size_t caller_index, std::vector<size_t>& result_buffer, size_t max_count) noexcept;
     };
 

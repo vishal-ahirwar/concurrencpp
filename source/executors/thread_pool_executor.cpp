@@ -17,7 +17,6 @@ namespace concurrencpp::details {
         }
 
         thread_local thread_pool_worker* s_tl_thread_pool_worker;
-        thread_local const size_t s_tl_hashed_index = calculate_hashed_index();
     }  // namespace
 
     class alignas(CRCPP_CACHE_LINE_ALIGNMENT) thread_pool_worker {
@@ -114,20 +113,15 @@ bool idle_worker_set::try_acquire_flag(size_t index) noexcept {
     return swapped;
 }
 
-size_t idle_worker_set::find_idle_worker(size_t caller_index) noexcept {
-    assert(caller_index < m_size || caller_index == static_cast<size_t>(-1));
+// should be called from a foreign thread
+size_t idle_worker_set::find_idle_worker() noexcept {
+    static thread_local const size_t search_index = calculate_hashed_index() % m_size;
     
     if (m_approx_size.load(std::memory_order_relaxed) <= 0) {
         return static_cast<size_t>(-1);
     }
-
-    const auto search_index = (caller_index != static_cast<size_t>(-1)) ? caller_index : (s_tl_hashed_index % m_size);
     for (size_t i = 0; i < m_size; i++) {
         const auto index = (search_index + i) % m_size;
-        if (index == caller_index) {
-            continue;
-        }
-
         if (try_acquire_flag(index)) {
             return index;
         }
@@ -558,14 +552,12 @@ void thread_pool_executor::enqueue(concurrencpp::task task) {
         return this_worker->enqueue_local(task);
     }
 
-    const auto search_index = (this_worker != nullptr) ? this_worker->index() : static_cast<size_t>(-1);
-    const auto idle_worker_pos = m_idle_workers.find_idle_worker(search_index);
-    if (idle_worker_pos != static_cast<size_t>(-1)) {
-        return m_workers[idle_worker_pos].enqueue_foreign(task);
+    auto dispatch_worker_index = m_idle_workers.find_idle_worker();
+    if (dispatch_worker_index == static_cast<size_t>(-1)) {
+        dispatch_worker_index = m_round_robin_cursor.fetch_add(1, std::memory_order_relaxed) % m_workers.size();
     }
 
-    const auto next_worker = m_round_robin_cursor.fetch_add(1, std::memory_order_relaxed) % m_workers.size();
-    m_workers[next_worker].enqueue_foreign(task);
+    m_workers[dispatch_worker_index].enqueue_foreign(task);
 }
 
 int thread_pool_executor::max_concurrency_level() const noexcept {
