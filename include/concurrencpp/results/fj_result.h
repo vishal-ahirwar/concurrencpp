@@ -190,7 +190,7 @@ namespace concurrencpp::details {
        public:
         template<class... result_types>
         fj_awaitable(executor_type* executor, result_types&&... results) :
-            fj_awaitable_base(n), m_results(std::move(results)...), m_executor(executor) {
+            fj_awaitable_base(n), m_results{ std::move(results)... }, m_executor(executor) {
             throw_if_empty_result();
         }
 
