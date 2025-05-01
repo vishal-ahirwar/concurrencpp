@@ -7,6 +7,7 @@
 #include <atomic>
 #include <memory>
 #include <chrono>
+#include <string_view>
 
 namespace concurrencpp::details {
     class CRCPP_API timer_state_base : public std::enable_shared_from_this<timer_state_base> {
@@ -119,6 +120,8 @@ namespace concurrencpp {
         void throw_if_empty(const char* error_message) const;
 
        public:
+        static constexpr std::string_view k_class_name = "timer";
+
         timer() noexcept = default;
         ~timer() noexcept;
 

@@ -7,6 +7,8 @@
 
 #include <chrono>
 
+using concurrencpp::details::throw_helper;
+
 using namespace std::chrono_literals;
 
 namespace concurrencpp::tests {
@@ -22,57 +24,70 @@ void concurrencpp::tests::test_timer_queue_make_timer() {
     auto timer_queue = std::make_shared<concurrencpp::timer_queue>(120s);
     assert_false(timer_queue->shutdown_requested());
 
-    assert_throws_with_error_message<std::invalid_argument>(
+    const auto null_executor_exception =
+        throw_helper::make_empty_argument_exception(timer_queue::k_class_name, "make_timer", "executor");
+
+    assert_throws(
         [timer_queue] {
             timer_queue->make_timer(100ms, 100ms, {}, [] {
             });
         },
-        concurrencpp::details::consts::k_timer_queue_make_timer_executor_null_err_msg);
+        null_executor_exception);
 
     timer_queue->shutdown();
     assert_true(timer_queue->shutdown_requested());
 
-    assert_throws_with_error_message<errors::runtime_shutdown>(
+    const auto shutdown_exception = throw_helper::make_worker_shutdown_exception(timer_queue::k_class_name, "make_timer");
+
+    assert_throws(
         [timer_queue] {
             auto inline_executor = std::make_shared<concurrencpp::inline_executor>();
             timer_queue->make_timer(100ms, 100ms, inline_executor, [] {
             });
         },
-        concurrencpp::details::consts::k_timer_queue_shutdown_err_msg);
+        shutdown_exception);
 }
 
 void concurrencpp::tests::test_timer_queue_make_oneshot_timer() {
     auto timer_queue = std::make_shared<concurrencpp::timer_queue>(120s);
     assert_false(timer_queue->shutdown_requested());
 
-    assert_throws_with_error_message<std::invalid_argument>(
+    const auto null_executor_exception =
+        throw_helper::make_empty_argument_exception(timer_queue::k_class_name, "make_one_shot_timer", "executor");
+
+    assert_throws(
         [timer_queue] {
             timer_queue->make_one_shot_timer(100ms, {}, [] {
             });
         },
-        concurrencpp::details::consts::k_timer_queue_make_oneshot_timer_executor_null_err_msg);
+        null_executor_exception);
 
     timer_queue->shutdown();
     assert_true(timer_queue->shutdown_requested());
 
-    assert_throws_with_error_message<errors::runtime_shutdown>(
+    const auto shutdown_exception = throw_helper::make_worker_shutdown_exception(timer_queue::k_class_name, "make_timer");
+
+    assert_throws(
         [timer_queue] {
             auto inline_executor = std::make_shared<concurrencpp::inline_executor>();
             timer_queue->make_one_shot_timer(100ms, inline_executor, [] {
             });
         },
-        concurrencpp::details::consts::k_timer_queue_shutdown_err_msg);
+        shutdown_exception);
 }
 
 void concurrencpp::tests::test_timer_queue_make_delay_object() {
     auto timer_queue = std::make_shared<concurrencpp::timer_queue>(120s);
     assert_false(timer_queue->shutdown_requested());
 
-    assert_throws_with_error_message<std::invalid_argument>(
+    const auto null_executor_exception =
+        throw_helper::make_empty_argument_exception(timer_queue::k_class_name, "make_delay_object", "executor");
+
+    assert_throws(
         [timer_queue] {
             timer_queue->make_delay_object(100ms, {});
         },
-        concurrencpp::details::consts::k_timer_queue_make_delay_object_executor_null_err_msg);
+        null_executor_exception);
 
     timer_queue->shutdown();
     assert_true(timer_queue->shutdown_requested());

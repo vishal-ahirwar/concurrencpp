@@ -33,6 +33,7 @@ set(concurrencpp_sources
         source/threads/thread.cpp
         source/timers/timer.cpp
         source/timers/timer_queue.cpp
+        source/utils/throw_helper.cpp
         source/utils/math_helper.cpp)
 
 set(concurrencpp_headers
@@ -78,10 +79,10 @@ set(concurrencpp_headers
         include/concurrencpp/threads/async_condition_variable.h
         include/concurrencpp/threads/thread.h
         include/concurrencpp/threads/cache_line.h
-        include/concurrencpp/timers/constants.h
         include/concurrencpp/timers/timer.h
         include/concurrencpp/timers/timer_queue.h
         include/concurrencpp/utils/bind.h
+        include/concurrencpp/utils/throw_helper.h
         include/concurrencpp/utils/math_helper.h
         include/concurrencpp/utils/slist.h
         include/concurrencpp/utils/dlist.h)
